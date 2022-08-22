@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"github.com/muesli/termenv"
+	"image/color"
 	"io"
 	"os"
 	"regexp"
@@ -14,36 +17,36 @@ type State struct {
 	Count uint64
 }
 
-func ansiColor(str string, code uint8) string {
-	return "\u001b[38;5;" + strconv.Itoa(int(code)) + "m" + str + "\u001b[0m"
+func colored(text string, color termenv.Color) string {
+	return fmt.Sprint(termenv.String(text).Foreground(color))
 }
 
-func red() uint8 {
-	return 196
+func red() color.Color {
+	return color.RGBA{255, 0, 0, 255}
 }
 
-func yellow() uint8 {
-	return 226
+func yellow() color.Color {
+	return color.RGBA{255, 240, 0, 255}
 }
 
-func veryDarkGray() uint8 {
-	return 240
+func veryDarkGray() color.Color {
+	return color.RGBA{5, 5, 5, 255}
 }
 
-func green() uint8 {
-	return 46
+func green() color.Color {
+	return color.RGBA{0, 255, 0, 255}
 }
 
-func lightGray() uint8 {
-	return 253
+func lightGray() color.Color {
+	return color.RGBA{200, 200, 200, 255}
 }
 
-func darkGray() uint8 {
-	return 245
+func darkGray() color.Color {
+	return color.RGBA{100, 100, 100, 255}
 }
 
-func blue() uint8 {
-	return 80
+func blue() color.Color {
+	return color.RGBA{0, 0, 255, 255}
 }
 
 func colorAndConvertTimestamp(lines []ChunkWithColors, state *State) []ChunkWithColors {
@@ -72,7 +75,7 @@ func colorAndConvertTimestamp(lines []ChunkWithColors, state *State) []ChunkWith
 			})
 		}
 
-		var newColors []uint8
+		var newColors []color.Color
 		copy(newColors, c.colorLayers)
 
 		var newMarker []Marker
@@ -109,7 +112,7 @@ func colorLogLevel(lines []ChunkWithColors, state *State) []ChunkWithColors {
 			continue
 		}
 		logLevel := c.string[index[0]:index[1]]
-		var colors = map[string]uint8{"info": green(), "error": red(), "warn": yellow(), "debug": veryDarkGray()}
+		var colors = map[string]color.Color{"info": green(), "error": red(), "warn": yellow(), "debug": veryDarkGray()}
 		var newColor = colors[strings.ToLower(logLevel)]
 
 		if index[0] != 0 {
@@ -120,7 +123,7 @@ func colorLogLevel(lines []ChunkWithColors, state *State) []ChunkWithColors {
 			})
 		}
 
-		var newColors []uint8
+		var newColors []color.Color
 		copy(newColors, c.colorLayers)
 
 		var newMarker []Marker
@@ -151,22 +154,22 @@ func main() {
 func colorLine(lines []ChunkWithColors, state *State) []ChunkWithColors {
 	var newLines []ChunkWithColors
 	for _, c := range lines {
-		var color uint8
+		var color1 color.Color
 		var marker Marker
 		if state.Count%2 == 0 {
-			color = lightGray()
+			color1 = lightGray()
 			marker = Even
 		} else {
-			color = darkGray()
+			color1 = darkGray()
 			marker = Odd
 		}
-		var newColors []uint8
+		var newColors []color.Color
 		copy(newColors, c.colorLayers)
 
 		var newMarker []Marker
 		copy(newMarker, c.marker)
 
-		newLines = append(newLines, ChunkWithColors{string: c.string, colorLayers: append(newColors, color), marker: append(newMarker, marker)})
+		newLines = append(newLines, ChunkWithColors{string: c.string, colorLayers: append(newColors, color1), marker: append(newMarker, marker)})
 	}
 	return newLines
 }
@@ -182,7 +185,7 @@ const (
 
 type ChunkWithColors struct {
 	string      string
-	colorLayers []uint8
+	colorLayers []color.Color
 	marker      []Marker
 }
 
@@ -200,7 +203,7 @@ func readIt() {
 			panic(err)
 		}
 
-		lines := []ChunkWithColors{{string: line, colorLayers: []uint8{}}}
+		lines := []ChunkWithColors{{string: line, colorLayers: []color.Color{}}}
 
 		lines = colorLine(lines, &state)
 		lines = colorLogLevel(lines, &state)
@@ -208,8 +211,9 @@ func readIt() {
 
 		finalString := ""
 		for _, chunkWithColors := range lines {
-			colorLayers := chunkWithColors.colorLayers
-			finalString += ansiColor(chunkWithColors.string, colorLayers[len(colorLayers)-1])
+			//blendedColors := chunkWithColors.colorLayers[len(chunkWithColors.colorLayers)-1]
+			blendedColors := blendAllColors(chunkWithColors.colorLayers)
+			finalString += colored(chunkWithColors.string, colorfulToAnsi(blendedColors))
 		}
 
 		state.Count += 1
