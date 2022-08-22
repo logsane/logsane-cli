@@ -19,5 +19,5 @@ func blendAllColors(colors []color.Color) colorful.Color {
 }
 
 func colorfulToAnsi(color1 color.Color) termenv.Color {
-	return termenv.ANSI.FromColor(color1)
+	return termenv.ColorProfile().FromColor(color1)
 }
