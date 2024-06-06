@@ -22,7 +22,7 @@ func colored(text string, color termenv.Color) string {
 }
 
 func red() color.Color {
-	return color.RGBA{255, 0, 0, 255}
+	return color.RGBA{255, 130, 0, 255}
 }
 
 func yellow() color.Color {
@@ -30,15 +30,19 @@ func yellow() color.Color {
 }
 
 func veryDarkGray() color.Color {
-	return color.RGBA{5, 5, 5, 255}
+	return color.RGBA{90, 90, 90, 255}
 }
 
 func green() color.Color {
-	return color.RGBA{0, 255, 0, 255}
+	return color.RGBA{190, 255, 0, 255}
 }
 
 func lightGray() color.Color {
 	return color.RGBA{200, 200, 200, 255}
+}
+
+func lessLightGray() color.Color {
+	return color.RGBA{150, 150, 150, 255}
 }
 
 func darkGray() color.Color {
@@ -46,19 +50,19 @@ func darkGray() color.Color {
 }
 
 func blue() color.Color {
-	return color.RGBA{0, 0, 255, 255}
+	return color.RGBA{140, 200, 255, 255}
 }
 
-func colorAndConvertTimestamp(lines []ChunkWithColors, state *State) []ChunkWithColors {
+func colorAndConvertTimestamp(line []ChunkWithColors, state *State) []ChunkWithColors {
 	r, err := regexp.Compile("((?:^|\\b)1[0-9]{9})|(1[0-9]{9}(?:$|\\b))") // FIXME: this is ugly and supports only soome timestamps
 	if err != nil {
 		panic(err)
 	}
-	var newLines []ChunkWithColors
-	for _, c := range lines {
+	var newLine []ChunkWithColors
+	for _, c := range line {
 		index := r.FindStringIndex(c.string)
 		if index == nil {
-			newLines = append(newLines, c)
+			newLine = append(newLine, c)
 			continue
 		}
 		i, err := strconv.ParseInt(c.string[index[0]:index[1]], 10, 64)
@@ -68,7 +72,7 @@ func colorAndConvertTimestamp(lines []ChunkWithColors, state *State) []ChunkWith
 		tm := time.Unix(i, 0)
 
 		if index[0] != 0 {
-			newLines = append(newLines, ChunkWithColors{
+			newLine = append(newLine, ChunkWithColors{
 				string:      c.string[:index[0]],
 				colorLayers: c.colorLayers,
 				marker:      c.marker,
@@ -81,14 +85,14 @@ func colorAndConvertTimestamp(lines []ChunkWithColors, state *State) []ChunkWith
 		var newMarker []Marker
 		copy(newMarker, c.marker)
 
-		newLines = append(newLines, ChunkWithColors{
+		newLine = append(newLine, ChunkWithColors{
 			string:      tm.String(),
 			colorLayers: append(newColors, blue()),
 			marker:      append(newMarker, Timestamp),
 		})
 
 		if index[1] != len(c.string) {
-			newLines = append(newLines, ChunkWithColors{
+			newLine = append(newLine, ChunkWithColors{
 				string:      c.string[index[1]:],
 				colorLayers: c.colorLayers,
 				marker:      c.marker,
@@ -96,19 +100,19 @@ func colorAndConvertTimestamp(lines []ChunkWithColors, state *State) []ChunkWith
 		}
 	}
 
-	return newLines
+	return newLine
 }
 
-func colorLogLevel(lines []ChunkWithColors, state *State) []ChunkWithColors {
-	var newLines []ChunkWithColors
+func colorLogLevel(line []ChunkWithColors, state *State) []ChunkWithColors {
+	var newLine []ChunkWithColors
 	r, err := regexp.Compile("(?i)(?:^|\\b)(info|error|warn|debug)(?:$|\\b)")
 	if err != nil {
 		panic(err)
 	}
-	for _, c := range lines {
+	for _, c := range line {
 		index := r.FindStringIndex(c.string)
 		if index == nil {
-			newLines = append(newLines, c)
+			newLine = append(newLine, c)
 			continue
 		}
 		logLevel := c.string[index[0]:index[1]]
@@ -116,7 +120,7 @@ func colorLogLevel(lines []ChunkWithColors, state *State) []ChunkWithColors {
 		var newColor = colors[strings.ToLower(logLevel)]
 
 		if index[0] != 0 {
-			newLines = append(newLines, ChunkWithColors{
+			newLine = append(newLine, ChunkWithColors{
 				string:      c.string[:index[0]],
 				colorLayers: c.colorLayers,
 				marker:      c.marker,
@@ -129,21 +133,21 @@ func colorLogLevel(lines []ChunkWithColors, state *State) []ChunkWithColors {
 		var newMarker []Marker
 		copy(newMarker, c.marker)
 
-		newLines = append(newLines, ChunkWithColors{
+		newLine = append(newLine, ChunkWithColors{
 			string:      logLevel,
 			colorLayers: append(newColors, newColor),
 			marker:      append(newMarker, LogLevel),
 		})
 
 		if index[1] != len(c.string) {
-			newLines = append(newLines, ChunkWithColors{
+			newLine = append(newLine, ChunkWithColors{
 				string:      c.string[index[1]:],
 				colorLayers: c.colorLayers,
 				marker:      c.marker,
 			})
 		}
 	}
-	return newLines
+	return newLine
 }
 
 func main() {
@@ -151,16 +155,16 @@ func main() {
 	readIt()
 }
 
-func colorLine(lines []ChunkWithColors, state *State) []ChunkWithColors {
-	var newLines []ChunkWithColors
-	for _, c := range lines {
+func colorLine(line []ChunkWithColors, state *State) []ChunkWithColors {
+	var newLine []ChunkWithColors
+	for _, c := range line {
 		var color1 color.Color
 		var marker Marker
 		if state.Count%2 == 0 {
 			color1 = lightGray()
 			marker = Even
 		} else {
-			color1 = darkGray()
+			color1 = lessLightGray()
 			marker = Odd
 		}
 		var newColors []color.Color
@@ -169,9 +173,9 @@ func colorLine(lines []ChunkWithColors, state *State) []ChunkWithColors {
 		var newMarker []Marker
 		copy(newMarker, c.marker)
 
-		newLines = append(newLines, ChunkWithColors{string: c.string, colorLayers: append(newColors, color1), marker: append(newMarker, marker)})
+		newLine = append(newLine, ChunkWithColors{string: c.string, colorLayers: append(newColors, color1), marker: append(newMarker, marker)})
 	}
-	return newLines
+	return newLine
 }
 
 type Marker string
@@ -203,14 +207,14 @@ func readIt() {
 			panic(err)
 		}
 
-		lines := []ChunkWithColors{{string: line, colorLayers: []color.Color{}}}
+		coloredLine := []ChunkWithColors{{string: line, colorLayers: []color.Color{}}}
 
-		lines = colorLine(lines, &state)
-		lines = colorLogLevel(lines, &state)
-		lines = colorAndConvertTimestamp(lines, &state)
+		coloredLine = colorLine(coloredLine, &state)
+		coloredLine = colorLogLevel(coloredLine, &state)
+		coloredLine = colorAndConvertTimestamp(coloredLine, &state)
 
 		finalString := ""
-		for _, chunkWithColors := range lines {
+		for _, chunkWithColors := range coloredLine {
 			//blendedColors := chunkWithColors.colorLayers[len(chunkWithColors.colorLayers)-1]
 			blendedColors := blendAllColors(chunkWithColors.colorLayers)
 			finalString += colored(chunkWithColors.string, colorfulToAnsi(blendedColors))
