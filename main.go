@@ -53,6 +53,196 @@ func blue() color.Color {
 	return color.RGBA{140, 200, 255, 255}
 }
 
+type ParenLikePair struct {
+	start string
+	end   string
+}
+
+// TODO: broken, buggy
+func colorParenLike(line []ChunkWithColors, state *State) []ChunkWithColors {
+	supported := []ParenLikePair{{"(", ")"}, {"[", "]"}, {"{", "}"}, {"<", ">"}, {"|", "|"}, {"'", "'"}, {`"`, `"`}, {"`", "`"}}
+	charToParenLikePair := map[string]ParenLikePair{}
+	for _, chars := range supported {
+		charToParenLikePair[chars.start] = chars
+		charToParenLikePair[chars.end] = chars
+	}
+	positions := map[string][]int{}
+
+	var newLine []ChunkWithColors
+
+	position := -1
+	for _, c := range line {
+		for _, char := range c.string {
+			position++
+			str := string(char)
+			matchedPair, exists := charToParenLikePair[str]
+			if !exists {
+				newLine = append(newLine,
+					ChunkWithColors{
+						string:      str,
+						colorLayers: c.colorLayers,
+						marker:      c.marker,
+					},
+				)
+				continue
+			}
+			if str == matchedPair.start {
+				positions[str] = append(positions[str], position)
+			}
+			if str == matchedPair.end {
+				matchedPositions, exists := positions[matchedPair.start]
+				if exists && len(matchedPositions) > 0 {
+					startPosition := matchedPositions[len(matchedPositions)-1]
+					matchedPositions = matchedPositions[:len(matchedPositions)-1]
+
+					var newColors []color.Color
+					copy(newColors, c.colorLayers)
+
+					var newMarker []Marker
+					copy(newMarker, c.marker)
+
+					position2 := -1
+					for _, chunk := range line {
+						done := false
+						for positionChunk, _ := range chunk.string {
+							position2++
+							if done {
+								continue
+							}
+							if position2 < startPosition {
+								continue
+							}
+							if position2+len(chunk.string) >= position {
+								newLine = append(newLine, ChunkWithColors{
+									string:      chunk.string[positionChunk : positionChunk+(position+1)-position2],
+									colorLayers: append(newColors, red()),
+									marker:      append(newMarker, ParenLike),
+								})
+								done = true
+							} else {
+								//newLine = append(newLine, ChunkWithColors{
+								//	string:      chunk.string,
+								//	colorLayers: append(newColors, red()),
+								//	marker:      append(newMarker, ParenLike),
+								//})
+								//break
+							}
+						}
+					}
+					//newLine = append(newLine, ChunkWithColors{
+					//	string:      c.string[startPosition:(position + 1)],
+					//	colorLayers: append(newColors, red()),
+					//	marker:      append(newMarker, ParenLike),
+					//})
+				}
+			}
+		}
+	}
+
+	return newLine
+}
+
+// https://stackoverflow.com/a/38191078/2709248
+func colorUUID(line []ChunkWithColors, state *State) []ChunkWithColors {
+	r, err := regexp.Compile("(?i)((?:^|\\b)([0-9A-F]{8}-[0-9A-F]{4}-[1][0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})|([0-9A-F]{8}-[0-9A-F]{4}-[2][0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})|([0-9A-F]{8}-[0-9A-F]{4}-[3][0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})|([0-9A-F]{8}-[0-9A-F]{4}-[4][0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})|([0-9A-F]{8}-[0-9A-F]{4}-[5][0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12})(?:$|\\b))")
+
+	if err != nil {
+		panic(err)
+	}
+
+	var newLine []ChunkWithColors
+	for _, c := range line {
+		indexes := r.FindAllStringIndex(c.string, -1)
+		if len(indexes) == 0 {
+			newLine = append(newLine, c)
+			continue
+		}
+		for _, index := range indexes {
+			if index[0] != 0 {
+				newLine = append(newLine, ChunkWithColors{
+					string:      c.string[:index[0]],
+					colorLayers: c.colorLayers,
+					marker:      c.marker,
+				})
+			}
+
+			structuredStuff := c.string[index[0]:index[1]]
+
+			var newColors []color.Color
+			copy(newColors, c.colorLayers)
+
+			var newMarker []Marker
+			copy(newMarker, c.marker)
+
+			newLine = append(newLine, ChunkWithColors{
+				string:      structuredStuff,
+				colorLayers: append(newColors, green()),
+				marker:      append(newMarker, UUID),
+			})
+
+			if index[1] != len(c.string) {
+				newLine = append(newLine, ChunkWithColors{
+					string:      c.string[index[1]:],
+					colorLayers: c.colorLayers,
+					marker:      c.marker,
+				})
+			}
+		}
+	}
+
+	return newLine
+}
+
+// TODO: broken, buggy
+func colorStructuredStuff(line []ChunkWithColors, state *State) []ChunkWithColors {
+	r, err := regexp.Compile("((?:^|\\b)[a-zA-Z0-9-_]+ {0,2}[:=] {0,2}[a-zA-Z0-9-_]+(?:$|\\b))")
+
+	if err != nil {
+		panic(err)
+	}
+	var newLine []ChunkWithColors
+	for _, c := range line {
+		indexes := r.FindAllStringIndex(c.string, -1)
+		if len(indexes) == 0 {
+			newLine = append(newLine, c)
+			continue
+		}
+		for _, index := range indexes {
+			if index[0] != 0 {
+				newLine = append(newLine, ChunkWithColors{
+					string:      c.string[:index[0]],
+					colorLayers: c.colorLayers,
+					marker:      c.marker,
+				})
+			}
+
+			structuredStuff := c.string[index[0]:index[1]]
+
+			var newColors []color.Color
+			copy(newColors, c.colorLayers)
+
+			var newMarker []Marker
+			copy(newMarker, c.marker)
+
+			newLine = append(newLine, ChunkWithColors{
+				string:      structuredStuff,
+				colorLayers: append(newColors, yellow()),
+				marker:      append(newMarker, Structure),
+			})
+
+			if index[1] != len(c.string) {
+				newLine = append(newLine, ChunkWithColors{
+					string:      c.string[index[1]:],
+					colorLayers: c.colorLayers,
+					marker:      c.marker,
+				})
+			}
+		}
+	}
+
+	return newLine
+}
+
 func colorAndConvertTimestamp(line []ChunkWithColors, state *State) []ChunkWithColors {
 	r, err := regexp.Compile("((?:^|\\b)1[0-9]{9})|(1[0-9]{9}(?:$|\\b))") // FIXME: this is ugly and supports only soome timestamps
 	if err != nil {
@@ -184,6 +374,10 @@ const (
 	Even      Marker = "Even"
 	Odd              = "Odd"
 	Timestamp        = "Timestamp"
+	Structure        = "Timestamp"
+	UUID             = "UUID"
+	Hex              = "Hex"
+	ParenLike        = "ParenLike"
 	LogLevel         = "LogLevel"
 )
 
@@ -210,8 +404,11 @@ func readIt() {
 		coloredLine := []ChunkWithColors{{string: line, colorLayers: []color.Color{}}}
 
 		coloredLine = colorLine(coloredLine, &state)
+		//coloredLine = colorStructuredStuff(coloredLine, &state)
 		coloredLine = colorLogLevel(coloredLine, &state)
 		coloredLine = colorAndConvertTimestamp(coloredLine, &state)
+		coloredLine = colorUUID(coloredLine, &state)
+		//coloredLine = colorParenLike(coloredLine, &state)
 
 		finalString := ""
 		for _, chunkWithColors := range coloredLine {
